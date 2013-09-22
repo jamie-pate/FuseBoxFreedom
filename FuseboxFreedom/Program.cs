@@ -1,5 +1,6 @@
 ﻿#define FUSE_ACTION_COMMENT
-//#define COMMENTS
+#define HELP_COMMENTS
+#define COMMENTS
 //#define FULL_COMMENT
 using System;
 using System.Collections.Generic;
@@ -10,8 +11,22 @@ using System.IO;
 
 
 namespace FuseboxFreedom {
+    /// <summary>
+    /// Convert an xml fusebox circuit to a cfscript cfc
+    /// TODO: convert an entire project
+    /// TODO: copy fbFreedom.cfc to cfc path
+    /// TODO: read fusebox.xml.cfm to output fbFreedomSettings.cfc
+    /// </summary>
     class Program {
         static void Main(string[] args) {
+            if (args.Length < 2) {
+                string file = typeof(Program).Assembly.Location;
+                file = Path.GetFileName(file);
+                Console.WriteLine("Usage: {0} \\path\\to\\circuit.xml.cfm \\path\\to\\circuit.cfc",
+                    file);
+                Console.WriteLine("Converts a fusebox XML circuit.xml.cfm to a cfcscript circuit.cfc");
+                Console.ReadKey();
+            }
             XDocument doc = XDocument.Load(args[0]);
             StreamWriter sw = new StreamWriter(args[1]);
 
@@ -35,7 +50,7 @@ namespace FuseboxFreedom {
 #if COMMENTS
                 "//Handle all the boilerplate",
 #endif
-                tab("this.fb = createObject('component', 'cfcs.fbFreedom').init(this)"),
+                tab("this.fb = createObject('component', 'cfcs.fbFreedom').init(this, variables)"),
                 "",
                 }.Concat(circuit.Elements("prefuseaction").SelectMany(pfa=>tab(WriteFA(pfa, "init"))))
                 .Concat(circuit.Elements("fuseaction").SelectMany(fa=>tab(WriteFA(fa))))
@@ -215,7 +230,7 @@ namespace FuseboxFreedom {
                     };
                 case "instantiate":
                     return comment(elem, OverWrite(elem, "object",
-                        String.Format("this.fb.instantiate(\"{0}\");",
+                        String.Format("this.fb.instantiate(\"{0}\")",
                             elem.Attr("class"))));
 
                 case "invoke":
@@ -223,10 +238,9 @@ namespace FuseboxFreedom {
                     if (mc == null) {
                         throw new NotFiniteNumberException(elem.ToString());
                     }
-                    return OverWrite(elem, "returnvalue",
-                        String.Format("this.fb.instantiate(\"{0}\")",
-                            elem.Attr("class")),
-                        tab(String.Format(".{0};", mc.Value)));
+                    return OverWrite(elem, "returnvariable",
+                        String.Format("this.fb.instantiate(\"{0}\")\n\t.{1}",
+                            elem.Attr("class"), mc.Value));
 
                 case "do":
                     return OverWrite(elem, "contentvariable",

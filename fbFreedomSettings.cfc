@@ -1,11 +1,13 @@
-<cfcomponent hint="see fbFreedom.cfc http://www.github.com/jamie-pate/FuseBoxFreedom">
-<cfscript>
+component hint="see fbFreedom.cfc http://www.github.com/jamie-pate/FuseBoxFreedom" output="False" {
     this.classpath = 'cfcs.';
-    //Add class to component mappings. If the name is the same it will automatically work
-    this.classes = {};
-    //add circuit to circuit.cfc mappings. Should work automatically for dotted paths.
-    this.circuits = {
-        storeCheckout2='store.checkout2';
+    //Add class to component aliases. If the name is the same it will automatically work
+    this.classes = {
+        abc='xyz'
     };
-</cfscript>
-</cfcomponent>
+
+    this.circuitpath = '';
+    //add circuit to circuit.cfc aliases. Should work automatically for dotted paths.
+    this.circuits = {
+        checkout='store.checkout2'
+    };
+}
