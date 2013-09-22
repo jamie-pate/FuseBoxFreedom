@@ -1,0 +1,1 @@
+<cfoutput>#testvar#|#testvar2#</cfoutput>

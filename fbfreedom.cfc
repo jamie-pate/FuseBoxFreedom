@@ -1,15 +1,20 @@
-component hint="http://www.github.com/jamie-pate/FuseBoxFreedom" output="False"{
+component hint="http://www.github.com/jamie-pate/FuseBoxFreedom" {
+    this.acl = {};
+    this.access_level = "public";
+
     function init(circuit_or_scope=false, circuit_scope=false) {
         if (not isObject(arguments.circuit_or_scope) and isStruct(arguments.circuit_or_scope)) {
             arguments.scope = arguments.circuit_or_scope;
             arguments.circuit_or_scope = false;
             this.current_circuit = false;
+            this.circuit_name = '<master circuit>';
             this.init_scope(arguments.scope);
         }
         if (isObject(arguments.circuit_or_scope)) {
             this.current_circuit = arguments.circuit_or_scope;
             this.current_circuit.circuit_scope = arguments.circuit_scope;
             arguments.scope = false;
+            this.circuit_name = '<pending>';
             //set later during get_method_circuit
         } else {
             //main instance has no circuit
@@ -30,21 +35,24 @@ component hint="http://www.github.com/jamie-pate/FuseBoxFreedom" output="False"{
         this.defaults(arguments.scope.attributes, url);
     }
 
+    function structSet(structure, key, value, overwrite=false) {
+        try {
+            structinsert(structure, key, value, overwrite)
+        } catch('expression') {}
+    }
 
     function set_xfa(name, value, overwrite=true) {
-        if (not structKeyExists(this.scope, "xfa")) {
-            this.scope.xfa = {};
+        var cscope = this.current_circuit.circuit_scope;
+        if (listLen(arguments.value, '.') eq 1) {
+            arguments.value = this.circuit_name & '.' & arguments.value;
         }
-        if (overwrite or not structkeyexists(this.scope.xfa, name)) {
-            this.scope.xfa[name] = value;
-        }
+        this.structSet(cscope, 'xfa', {}, false);
+        this.structSet(cscope.xfa, name, value, overwrite);
     }
 
     function instantiate(class) {
         var classes = this.settings.classes;
-        if (not structkeyexists(classes, arguments.class)) {
-            classes[arguments.class] = arguments.class;
-        }
+        this.structSet(classes, arguments.class, arguments.class, false);
         return createobject('component', this.settings.classpath & classes[arguments.class]);
     }
 
@@ -57,13 +65,19 @@ component hint="http://www.github.com/jamie-pate/FuseBoxFreedom" output="False"{
     }
 
     function get_method_circuit(fuseAction) {
-        var path = listDeleteAt(arguments.fuseAction,listlen(arguments.fuseAction, '.'), '.');
+        var path = listDeleteAt(arguments.fuseAction,
+                                listlen(arguments.fuseAction, '.'),
+                                '.');
+        var circuit_name = path;
         var result = false;
+        var scope = this.scope;
+        var need_init = false;
+        var scope_is_same = false;
         if (structKeyExists(this.settings.circuits, path)) {
             path = this.settings.circuits[path];
         }
         if (structKeyExists(this.circuits, path)) {
-            return this.circuits[path];
+            result = this.circuits[path];
         } else {
             result = createObject('component', this.settings.circuitPath & path & '.circuit');
             result.filePath = replace(this.settings.circuitPath & path, '.', '/', 'all');
@@ -71,14 +85,36 @@ component hint="http://www.github.com/jamie-pate/FuseBoxFreedom" output="False"{
             //propagate global variable scope
             result.scope = this.scope;
             result.fb.scope = this.scope;
-            this.copy_scope(this.scope, result.circuit_scope);
-            result.init();
+            result.fb.circuit_name = circuit_name;
             this.settings.circuits[path] = result;
-            return result;
+            need_init = true;
+        }
+        if (isObject(this.current_circuit)) {
+            scope_is_same = result.fb.circuit_name eq this.circuit_name;
+            scope = this.current_circuit.circuit_scope;
+        }
+        if (not scope_is_same) {
+            this.copy_scope(scope, result.circuit_scope);
+        }
+        if (need_init) {
+            result.init();
+        }
+        return result;
+    }
+
+    function _access_check(access_level, internalRequest) {
+        if (access_level eq 'internal' and not internalRequest) {
+            throw(message='Unable to access #circuit.fb.circuit_name#.#arguments.fuseAction#. Access is #access_level# only.',
+                  type='fbf:access_denied');
         }
     }
 
-    function do(fuseAction, saveContent=False) {
+    function access_check(fuseAction, internalRequest) {
+        this._access_check(this.acl[arguments.fuseAction], arguments.internalRequest);
+        this._access_check(this.access_level, arguments.internalRequest);
+    }
+
+    function do(fuseAction, internalRequest=False) {
         var circuit = false;
         var result = '';
         if (listlen(arguments.fuseAction, '.') gt 1) {
@@ -88,42 +124,48 @@ component hint="http://www.github.com/jamie-pate/FuseBoxFreedom" output="False"{
         } else {
             circuit = this.current_circuit;
         }
-        if (arguments.saveContent) {
-            saveContent variable=result {
-                circuit[arguments.fuseAction]();
-            }
-        } else {
-            result = circuit[arguments.fuseaction]();
+        circuit.fb.access_check(arguments.fuseAction, internalRequest);
+        savecontent variable='result' {
+            circuit[arguments.fuseAction]();
         }
         return result;
     }
 
-    function circuit_include(template) {
+    function circuit_include(template)  {
         //can't believe this works
-        include arguments.template;
+        var result = '';
+        savecontent variable='result' {
+            include arguments.template;
+        }
+        return result;
     }
 
     function include(template, saveContent=False) {
         var result = '';
         arguments.template = '/' & this.current_circuit.filePath & '/' & arguments.template;
         this.current_circuit.circuit_include = this.circuit_include;
-        if (saveContent) {
-            savecontent variable="result" {
-                this.current_circuit.circuit_include(template)
-            }
-            result;
-        } else {
-            this.current_circuit.circuit_include(arguments.template);
-        }
-        return result;
+        return this.current_circuit.circuit_include(template);
     }
 
     function handleRequest(method) {
         var i = 0;
+        var ex2 = {};
         if (not structKeyExists(arguments, 'method')) {
             arguments.method = url.method;
         }
-        return this.do(method);
+        try {
+            //TODO: reset here
+            //content(reset=True);
+            writeOutput(this.do(method));
+            return true;
+        } catch ('expression' ex) {
+            if (refindnocase('^invalid component definition', ex.message) gt 0) {
+                dump(ex); abort;
+                return false;
+            } else {
+                rethrow;
+            }
+        }
     }
 
     function defaults(structure, defaults) {
