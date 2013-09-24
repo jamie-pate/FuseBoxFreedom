@@ -26,9 +26,9 @@ Usage:
 GOOD NEWS EVERYBODY!
 ----
 
-FuseBoxFreedom increased the speed of my Fusebox 4.1 XML.CFM project 5x!
+FuseBoxFreedom increased the speed of my Fusebox 4.1 XML.CFM project ~~5x~~ 30% - 2.5x
 
-That's right. Page loads went down from minimum 1200ms to minimum 250ms! This is not even including parse time.
+Page loads went down from minimum ~~1200ms~~ 366ms to minimum 250ms! This is not even including parse time.
 
 
 NOTES:
@@ -57,10 +57,14 @@ but modern cf runs on the JVM and that makes big wads of code the opposite of go
 hot spots don't get the attention they deserve, etc etc)
 
 With a looming deadline I had to make a choice, Hack on the WETT (Write everything twelve times) imperative
-transform/parse code, or replace the whole thing completely. 12 hours later I had something that works, 5x
-faster than the transform/parsed version of the same page. This was a regular 1200ms request processing time, shaved down to 90ms!
+transform/parse code, or replace the whole thing completely. 12 hours later I had something that works, ~~5x~~ 30%-2.5x
+faster than the transform/parsed version of the same page. This was a regular ~~1200m~~ 360ms request processing time, shaved down to 250ms
+
+(there was a separate problem where an expensive query was being called 14x in prefuseaction that was solved because the new code only calls it once per circuit which is technically not bw compatible but better, i think for performance)
+
 
 TL;DR
 ---
 If anyone else out there is feeling trapped by an old site running fusebox, This is for you.
 And if you encounter any quirks during conversion, or bugs in the runtime, feel free to send a pull request.
+
