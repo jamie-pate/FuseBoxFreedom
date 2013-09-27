@@ -7,12 +7,17 @@ Tired of dealing with crusty old Fusebox XML files?
 Wish you didn't have to deal with massive parsed files that unroll your fuseactions
 and generally try their best to defeat the JVM?
 
-FuseBoxFreedom attempts to replace fusebox with a lightweight cfc based drop-in.
+FuseBoxFreedom attempts to replace fusebox with a lightweight cfc based **partial** drop-in.
 It converts circuit.xml.cfm files to circuit.cfc cfscript and handles requests like fusebox did,
-but without the clunky parser getting in the way.
+but without the clunky parser getting in the way. There are configuration options to block specific
+methods (circuit.fuseAction) from executing when processing a request. The handleRequest method wil
+return false if the request was blocked, or the circuit requested has not been converted.
 
-The re-parser is written in C# (Linq to XML) because it was the quickest way I could think of to rewrite XML,
-but the output should (eventually) run in Railo/Coldfusion 9+ environments.
+The re-parser is written in C# (Linq to XML)
+but the output should run in Railo/Coldfusion 9+ environments.
+In the future this could be converted to a cfc or xslt or some combination and process
+the circuit cfcs the same way fusebox does for maximum compatibility.
+
 
 * Still very early, any contributions would be welcome.
 
@@ -23,14 +28,6 @@ Usage:
 * * FuseboxFreedom.exe \path\to\,\other\path\to\[,..\otherpath\to] circuit.xml.cfm circuit.cfc [watch]
 * specify 'watch' to continue running and process any specified files when they are changed
 
-GOOD NEWS EVERYBODY!
-----
-
-FuseBoxFreedom increased the speed of my Fusebox 4.1 XML.CFM project ~~5x~~ 30% - 2.5x
-
-Page loads went down from minimum ~~1200ms~~ 366ms to minimum 250ms! This is not even including parse time.
-
-
 NOTES:
 ---
 Offers backwards compatibility with a direct conversion,
@@ -40,31 +37,38 @@ Apparently I never needed most of that cruft. It also does partial conversion,
 so You can start using it on a few circuits without fixing the entire site at once.
 
 The output is pure cfscript which is much more aesthetically pleasing than tag soup.
-It also has the advantage that cfscript runs faster in modern cf engines. (cf9, railo 3/4)
+~~~It also has the advantage that cfscript reportedly runs faster in modern cf engines. (cf9, railo 3/4)~~~
+
 
 I used a clean room design, based mostly from my expectation and understanding of the XML grammar behavior,
 so there is no attachment/reliance on any previous fusebox code base.
 
+Performance currently hovers near the parsed circuit.xml performance level (a little slower even) for small circuits.
+For **large** circuits however, fbfreedom is a clear winner so far. More accurate benchmarking and some (any) optimization
+will hopefully prove fbfreedom faster in the long term.
+
 Reasoning:
 ---
 After I finally spent many hours digging into the fusebox 4.1 transformer and parser (that I'd inherited and been running for 5 years)
-and tried to monkey with them to overcome the "too much code" errors that Railo was encountering (caused by firehosing fuse action code (and probably too many nested do tags on my part)) into the parsed files.
+and tried to monkey with them to overcome the "too much code" errors that Railo was encountering (caused by unrolling fuse action code (and probably too many nested do tags on my part)) into the parsed files.
 
 The code for fb4.1 is ... less than maintable.
 Combine that with the fact that flat parsed files may be a good idea for a dumb interpreter,
-but modern cf runs on the JVM and that makes big wads of code the opposite of good!
-(Lots of classes suck up RAM, jit time goes through the roof, 
-hot spots don't get the attention they deserve, etc etc)
+but modern cf runs on the JVM and that makes big wads of code the opposite of good! (especially with 'good' performance/caching settings)
 
 With a looming deadline I had to make a choice, Hack on the WETT (Write everything twelve times) imperative
-transform/parse code, or replace the whole thing completely. 12 hours later I had something that works, ~~5x~~ 30%-2.5x
-faster than the transform/parsed version of the same page. This was a regular ~~1200m~~ 360ms request processing time, shaved down to 250ms
-
-(there was a separate problem where an expensive query was being called 14x in prefuseaction that was solved because the new code only calls it once per circuit which is technically not bw compatible but better, i think for performance)
+transform/parse code, or replace the whole thing completely. 12 hours later I had something that 'works for me'
 
 
 TL;DR
 ---
-If anyone else out there is feeling trapped by an old site running fusebox, This is for you.
+If anyone else out there is feeling trapped by an old site running fusebox, This is for you. Large circuits running fuseboxFreedom seem to be slightly faster than parsed fusebox 4.1 code with 'best' performance settings enabled.
 And if you encounter any quirks during conversion, or bugs in the runtime, feel free to send a pull request.
 
+TODO:
+---
+Add proper unit tests.
+Fix scope issues
+Find a better way to distribute scope? (unit tests will help).
+Proper benchmarking tests.
+Actual performance optimizations! (there are none yet).

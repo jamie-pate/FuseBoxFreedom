@@ -8,6 +8,12 @@ component hint="see fbFreedom.cfc http://www.github.com/jamie-pate/FuseBoxFreedo
     this.circuitpath = '';
     //add circuit to circuit.cfc aliases. Should work automatically for dotted paths.
     this.circuits = {
-        checkout='store.checkout2'
+        checkout='store.checkout2',
+        storecart='store.cart'
     };
+
+    //regular expression evaluated against url.method. Matching method strings will be blocked.
+    this.blockedFuseActions = '^(storecart\.)';
+
+    this.defaultFuseAction = 'home.homepage';
 }
