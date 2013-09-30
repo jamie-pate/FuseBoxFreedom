@@ -146,6 +146,14 @@ namespace FuseboxFreedom {
 #if COMMENTS
                 "//Handle all the boilerplate",
 #endif
+#if HELP_COMMENTS
+                tab("//IMPORTANT: Do not update this file directly if there is still a circuit.xml.cfm file in the same directory"),
+                tab("//This file was generated automatically with " + Path.GetFileName(typeof(Program).Assembly.Location)),
+                tab("//Use "),
+                tab("//\t " + Path.GetFileName(typeof(Program).Assembly.Location) + " path/to/this/circuit circuit.xml.cfm circuit.cfc watch"),
+                tab("//to automatically propagate changes from the circuit.xml.cfm to the circuit.cfc"),
+                tab("//If the circuit.xml.cfm source file has been removed, it is probably safe to ignore these instructions"),
+#endif
                 tab("this.fb = createObject('component', 'cfcs.fbFreedom').init(this, variables)"),
                 
                 tab(CheckSupportedAccess(circuit))

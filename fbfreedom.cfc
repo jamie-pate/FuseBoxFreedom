@@ -45,6 +45,7 @@ component hint="http://www.github.com/jamie-pate/FuseBoxFreedom" output="false"{
     }
 
     function set_xfa(name, value, overwrite=true) {
+        //FIXME: xfa should probably be local to the current fuseaction??
         var cscope = this.circuit_scope;
         if (listLen(arguments.value, '.') eq 1) {
             arguments.value = this.circuit_name & '.' & arguments.value;
