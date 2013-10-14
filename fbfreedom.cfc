@@ -118,16 +118,16 @@ component hint="http://www.github.com/jamie-pate/FuseBoxFreedom" output="false"{
         return {input=input_scope, output=output_scope, circuit=result, debug=debug};
     }
 
-    function _access_check(access_level, internalRequest) {
+    function _access_check(fuseaction, access_level, internalRequest) {
         if (access_level eq 'internal' and not internalRequest) {
-            throw(message='Unable to access #circuit.fb.circuit_name#.#arguments.fuseAction#. Access is #access_level# only.',
+            throw(message='Unable to access #this.circuit_name#.#arguments.fuseAction#. Access is #access_level# only. #internalrequest#',
                   type='fbf:access_denied');
         }
     }
 
     function access_check(fuseAction, internalRequest) {
-        this._access_check(this.acl[arguments.fuseAction], arguments.internalRequest);
-        this._access_check(this.access_level, arguments.internalRequest);
+        this._access_check(arguments.fuseaction, this.acl[arguments.fuseAction], arguments.internalRequest);
+        this._access_check(arguments.fuseaction, this.access_level, arguments.internalRequest);
     }
 
     function do(fuseAction, internalRequest=False) {
@@ -187,7 +187,7 @@ component hint="http://www.github.com/jamie-pate/FuseBoxFreedom" output="false"{
         return this.current_circuit.__circuit_include(template);
     }
 
-    function handleRequest(method) {
+    function handleRequest(method, internalRequest=false) {
         var i = 0;
         var ex2 = {};
         var result = '';
@@ -206,7 +206,7 @@ component hint="http://www.github.com/jamie-pate/FuseBoxFreedom" output="false"{
         try {
             //TODO: reset here?
             //content(reset=True);
-            result = this.do(method);
+            result = this.do(method, arguments.internalRequest);
             if (isBoolean(result)) {
                 return result;
             }
