@@ -9,6 +9,8 @@ using System.Text;
 using System.Xml.Linq;
 using System.IO;
 using System.Xml;
+using System.Runtime.InteropServices;
+using System.Diagnostics;
 
 
 namespace FuseboxFreedom {
@@ -19,13 +21,16 @@ namespace FuseboxFreedom {
     /// TODO: read fusebox.xml.cfm to output fbFreedomSettings.cfc
     /// </summary>
     class Program {
-
+        [DllImport("user32.dll")]
+        static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
         static System.Threading.ManualResetEvent wait_exit = new System.Threading.ManualResetEvent(false);
-        static FileSystemWatcher[] watchers = null;
-        static string output_filename = null;
-        static string input_file = null;
+        public static FileSystemWatcher[] watchers = null;
+        public static string output_filename = null;
+        public static string input_file = null;
+        public static event EventHandler<WatcherNotifyEventArgs> WatchNotify;
+        [STAThread]
         static void Main(string[] args) {
-            if (args.Length < 2) {
+            if (args.Length == 1 || args.Contains("/?") || args.Contains("--help")) {
                 string file = typeof(Program).Assembly.Location;
                 file = Path.GetFileName(file);
                 Console.WriteLine("Usage: {0} \\path\\to\\circuit.xml.cfm \\path\\to\\circuit.cfc",
@@ -33,18 +38,24 @@ namespace FuseboxFreedom {
                 Console.WriteLine("Converts a fusebox XML circuit.xml.cfm to a cfcscript circuit.cfc");
                 Console.WriteLine("\t or: {0} \\path\\to\\,\\other\\path\\to\\[..\\other\topath\\to] circuit.xml.cfm circuit.cfc [watch]",
                      file);
-                Console.WriteLine("\t specify 'watch' to continue running and process any specified files when they are changed");
                 Console.WriteLine("Convert many circuit.xml.cfm circuits to circuit.cfc");
+                Console.WriteLine("\t specify 'watch' to continue running and process any specified files when they are changed");
+                Console.WriteLine("\t{0} --help, {0} /?: show this message", file);
                 Console.ReadKey();
             }
-            if (args.Length == 2) {
+            if (args.Length == 0) {
+                ShowWindow(Process.GetCurrentProcess().MainWindowHandle, 0);
+                System.Windows.Forms.Application.EnableVisualStyles();
+                System.Windows.Forms.Application.Run(new GUI());
+            }
+            else if (args.Length == 2) {
                 Convert(args[0], args[1]);
             } else {
                 string[] paths = args[0].Split(',');
                 foreach (string path in paths) {
                     Convert(path, args[1], args[2]);
                 }
-                if (args[3] == "watch") {
+                if (args.Length > 3 && args[3] == "watch") {
                     Console.WriteLine("Watching:\n\t{0}", String.Join("\n\t",paths.Select(p=>Path.Combine(p, args[1]))));
                     input_file = args[1];
                     output_filename = args[2];
@@ -56,7 +67,7 @@ namespace FuseboxFreedom {
                 
         }
 
-        static FileSystemWatcher Watch(string path, string from) {
+        public static FileSystemWatcher Watch(string path, string from) {
             //path = Path.GetFullPath(path);
             FileSystemWatcher w = new FileSystemWatcher(path);
             w.Changed += new FileSystemEventHandler(w_Notify);
@@ -71,34 +82,82 @@ namespace FuseboxFreedom {
         static void w_Renamed(object sender, RenamedEventArgs e) {
             if (e.Name == input_file) {
                 string path = ((FileSystemWatcher)sender).Path;
-                Console.WriteLine("File {0} -> {1}", e.FullPath, output_filename);
-                Convert(e.FullPath, Path.Combine(path, output_filename));
+                var h = Program.WatchNotify;
+                if (h != null) {
+                    h(sender, new WatcherNotifyEventArgs(true, null, true));
+                } else {
+                    Console.Write("File {0}", e.FullPath);
+                }
+                try {
+                    Convert(e.FullPath, Path.Combine(path, output_filename));
+                    if (h != null) {
+                        h(sender, new WatcherNotifyEventArgs(true, null, false));
+                    } else {
+                        Console.WriteLine(" -> " + output_filename);
+                    }
+                } catch (Exception ex) {
+                    if (h != null) {
+                        h(sender, new WatcherNotifyEventArgs(true, ex));
+                    } else {
+                        Console.WriteLine("\t{0}\n{1}", ex.GetType().Name, ex.Message);
+                    }
+                }
             }
         }
 
         static void w_Disposed(object sender, EventArgs e) {
-            Console.WriteLine("Watcher Disposed!");
+            var h = Program.WatchNotify;
+            if (h != null) {
+                h(sender, new WatcherNotifyEventArgs(false, null));
+            } else {
+                Console.WriteLine("Watcher Disposed!");
+            }
             RemoveWatcher((FileSystemWatcher)sender);
         }
 
         static void w_Error(object sender, ErrorEventArgs e) {
-            Console.WriteLine("Error: {0} : {1}",
-                              e.GetException().GetType().Name,
-                              e.GetException().Message);
+            var h = Program.WatchNotify;
+            if (h != null) {
+                h(sender, new WatcherNotifyEventArgs(true, e.GetException()));
+            } else {
+                Console.WriteLine("Error: {0} : {1}",
+                                  e.GetException().GetType().Name,
+                                  e.GetException().Message);
+            }
         }
 
         static void w_Notify(object sender, FileSystemEventArgs e) {
             if (e.Name == input_file) {
+                
+            var h = Program.WatchNotify;
                 Console.Write("File {0} {1}", e.FullPath, e.ChangeType);
                 switch (e.ChangeType) {
                     case WatcherChangeTypes.Deleted:
-                        Console.WriteLine("\t Watcher removed");
+
+                        if (h != null) {
+                            h(sender, new WatcherNotifyEventArgs(false, null, true));
+                        } else {
+                            Console.WriteLine("\t Watcher removed");
+                        }
                         RemoveWatcher((FileSystemWatcher)sender);
                         break;
                     case WatcherChangeTypes.Changed:
-                        Console.Write(" -> " + output_filename);
+
                         string path = ((FileSystemWatcher)sender).Path;
-                        Convert(e.FullPath, Path.Combine(path, output_filename));
+                        try {
+                            Convert(e.FullPath, Path.Combine(path, output_filename));
+                            if (h != null) {
+                                h(sender, new WatcherNotifyEventArgs(true, null, false));
+                            } else {
+                                Console.WriteLine(" -> " + output_filename);
+                            }
+                        } catch (Exception ex) {
+                            if (h != null) {
+                                h(sender, new WatcherNotifyEventArgs(true, ex));
+                            } else {
+                                Console.WriteLine("\t{0}\n{1}", ex.GetType().Name, ex.Message);
+                            }
+                        }
                         break;
                 }
                 Console.WriteLine();
@@ -115,7 +174,7 @@ namespace FuseboxFreedom {
             }
         }
 
-        static void Convert(string path, string from, string to) {
+        public static void Convert(string path, string from, string to) {
             Convert(Path.Combine(path, from),
                     Path.Combine(path, to));
         }
@@ -398,6 +457,16 @@ namespace FuseboxFreedom {
             }
             
         }
+        public class WatcherNotifyEventArgs : EventArgs {
+            public WatcherNotifyEventArgs(bool processed, Exception ex, bool? progress = null) {
+                this.processed = processed;
+                this.ex = ex;
+                this.progress = progress;
+            }
+            public bool? progress { get; private set; }
+            public bool processed { get; private set; }
+            public Exception ex { get; private set; }
+        }
 
     }
     static class XElementExtensions {
@@ -408,6 +477,11 @@ namespace FuseboxFreedom {
             } else {
                 return "";
             }
+        }
+
+        public static bool Attr(this XElement elem, XName name, bool defaultValue) {
+            bool value;
+            return bool.TryParse(elem.Attr(name),out value) ? value : defaultValue;
         }
     }
 
