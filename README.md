@@ -23,10 +23,17 @@ the circuit cfcs the same way fusebox does for maximum compatibility.
 
 Usage:
 * Convert a fusebox XML circuit.xml.cfm to a cfcscript circuit.cfc
+* * FuseboxFreedom.exe (no arguments) will open GUI mode
 * * FuseboxFreedom.exe \path\to\circuit.xml.cfm \path\to\circuit.cfc
 * or: Convert many circuit.xml.cfm circuits to circuit.cfc:
 * * FuseboxFreedom.exe \path\to\,\other\path\to\[,..\otherpath\to] circuit.xml.cfm circuit.cfc [watch]
 * specify 'watch' to continue running and process any specified files when they are changed
+
+GUI MODE:
+---
+Gui mode will run a windows form interface that allows visual configuration. Choose your project root and add some paths to the path list. Check the **watch for changes** checkbox to start watching for changes or the **process** button to immediately convert all circuits to cfc.
+
+The GUI settings *should* save your settings across loads. Sometimes it seems to lose the persistent settings so it's best to save a backup of your settings if they are complicated.
 
 NOTES:
 ---
