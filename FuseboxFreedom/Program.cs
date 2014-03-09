@@ -46,7 +46,11 @@ namespace FuseboxFreedom {
             if (args.Length == 0) {
                 ShowWindow(Process.GetCurrentProcess().MainWindowHandle, 0);
                 System.Windows.Forms.Application.EnableVisualStyles();
-                System.Windows.Forms.Application.Run(new GUI());
+                try {
+                    System.Windows.Forms.Application.Run(new GUI());
+                } catch (Exception ex) {
+                    new System.Windows.Forms.ThreadExceptionDialog(ex).ShowDialog();
+                }
             }
             else if (args.Length == 2) {
                 Convert(args[0], args[1]);
