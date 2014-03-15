@@ -22,6 +22,10 @@ namespace FuseboxFreedom {
 
             tbl = (Windows7.DesktopIntegration.Interop.ITaskbarList3)new Windows7.DesktopIntegration.Interop.CTaskbarList();
             var sd = FuseboxFreedom.Properties.Settings.Default;
+
+            if (String.IsNullOrEmpty(sd.project)) {
+                sd.Upgrade();
+            }
             var sstring = sd.project;
             dgv_paths.AutoGenerateColumns = false;
             dgv_paths.DataSource = new BindingList<PathSetting>();
