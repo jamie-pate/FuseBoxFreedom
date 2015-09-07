@@ -11,6 +11,7 @@ using System.IO;
 using System.Xml;
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.Timers;
 
 
 namespace FuseboxFreedom {
@@ -43,6 +44,7 @@ namespace FuseboxFreedom {
                 Console.WriteLine("\t{0} --help, {0} /?: show this message", file);
                 Console.ReadKey();
             }
+            RetryTimer.Elapsed += RetryTimer_Elapsed;
             if (args.Length == 0) {
                 ShowWindow(Process.GetCurrentProcess().MainWindowHandle, 0);
                 System.Windows.Forms.Application.EnableVisualStyles();
@@ -121,18 +123,81 @@ namespace FuseboxFreedom {
 
         static void w_Error(object sender, ErrorEventArgs e) {
             var h = Program.WatchNotify;
-            if (h != null) {
-                h(sender, new WatcherNotifyEventArgs(true, e.GetException()));
-            } else {
-                Console.WriteLine("Error: {0} : {1}",
-                                  e.GetException().GetType().Name,
-                                  e.GetException().Message);
+            var ex = e.GetException();
+            if (!(ex is System.IO.IOException)) {
+                if (h != null) {
+                    h(sender, new WatcherNotifyEventArgs(true, e.GetException()));
+                } else {
+                    Console.WriteLine("Error: {0} : {1}",
+                                      e.GetException().GetType().Name,
+                                      e.GetException().Message);
+
+                }
             }
         }
 
+        private class RetryWatch {
+            public RetryWatch(FileSystemWatcher w, FileSystemEventArgs e) {
+                this.watcher = w;
+                this.eventArgs = e;
+                this.retries = RETRY_COUNT;
+            }
+            public FileSystemWatcher watcher { get; private set; }
+            public FileSystemEventArgs eventArgs { get; private set; }
+            public int retries;
+        }
+        static Timer RetryTimer = new Timer(RETRY_INTERVAL);
+        static void Retry(FileSystemEventArgs e, FileSystemWatcher sender) {
+            lock (RetryQueue) {
+                if (RetryQueue.ContainsKey(e)) {
+                    RetryQueue[e].retries--;
+                    if (RetryQueue[e].retries <= 0) {
+                        RetryQueue.Remove(e);
+                    }
+                } else {
+                    RetryQueue.Add(e, new RetryWatch(sender, e));
+                }
+            }
+            RetryTimer.Enabled = true;
+        }
+
+        static void RetryTimer_Elapsed(object sender, ElapsedEventArgs e) {
+            RetryWatch[] queue;
+            lock (RetryQueue) {
+                queue = RetryQueue.Values.ToArray();
+            }
+            queue = queue.Where(rw => DoRetry(rw)).ToArray();
+            lock (RetryQueue) {
+                foreach (RetryWatch resolved in queue) {
+                    RetryQueue.Remove(resolved.eventArgs);
+                }
+            }
+        }
+        static bool DoRetry(RetryWatch w) {
+            try {
+                DoConvert(w.eventArgs, w.watcher);
+                return true;
+            } catch (System.IO.IOException) {
+                return false;
+            }
+        }
+
+        static void DoConvert(FileSystemEventArgs e, FileSystemWatcher sender) {
+            var h = Program.WatchNotify;
+            string path = sender.Path;
+            Convert(e.FullPath, Path.Combine(path, output_filename));
+            if (h != null) {
+                h(sender, new WatcherNotifyEventArgs(true, null, false));
+            } else {
+                Console.WriteLine(" -> " + output_filename);
+            }
+        }
+        static Dictionary<FileSystemEventArgs, RetryWatch> RetryQueue = new Dictionary<FileSystemEventArgs, RetryWatch>();
+        const double RETRY_INTERVAL = 100;
+        const int RETRY_COUNT = 2;
         static void w_Notify(object sender, FileSystemEventArgs e) {
             if (e.Name == input_file) {
-                
+
             var h = Program.WatchNotify;
                 Console.Write("File {0} {1}", e.FullPath, e.ChangeType);
                 switch (e.ChangeType) {
@@ -147,25 +212,32 @@ namespace FuseboxFreedom {
                         break;
                     case WatcherChangeTypes.Changed:
 
-                        string path = ((FileSystemWatcher)sender).Path;
                         try {
-                            Convert(e.FullPath, Path.Combine(path, output_filename));
-                            if (h != null) {
-                                h(sender, new WatcherNotifyEventArgs(true, null, false));
-                            } else {
-                                Console.WriteLine(" -> " + output_filename);
-                            }
+                            DoConvert(e, (FileSystemWatcher)sender);
                         } catch (Exception ex) {
-                            if (h != null) {
-                                h(sender, new WatcherNotifyEventArgs(true, ex));
+
+                            if (ex is System.IO.IOException) {
+
+                                if (h == null) {
+                                    Console.WriteLine("\t Retrying: {0}\n{1}", ex.GetType().Name, ex.Message);
+                                }
+                                Retry(e, (FileSystemWatcher)sender);
                             } else {
-                                Console.WriteLine("\t{0}\n{1}", ex.GetType().Name, ex.Message);
+                                if (h != null) {
+                                    h(sender, new WatcherNotifyEventArgs(true, ex));
+                                } else {
+                                    Console.WriteLine("\t{0}\n{1}", ex.GetType().Name, ex.Message);
+                                }
                             }
                         }
                         break;
                 }
                 Console.WriteLine();
             }
+        }
+
+        static void t_Elapsed(object sender, ElapsedEventArgs e) {
+            throw new NotImplementedException();
         }
 
         static void RemoveWatcher(FileSystemWatcher w) {
