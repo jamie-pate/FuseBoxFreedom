@@ -243,7 +243,7 @@ component hint="http://www.github.com/jamie-pate/FuseBoxFreedom" output="false"{
                 throw "omg you killed kenny";
         }
         if (isStruct(arguments.src) and isstruct(arguments.dest)) {
-            if (not structKeyExists(arguments.src, 'copied')) {
+            if (not structKeyExists(arguments.src, 'copied') or arguments.src.copied == '') {
                 arguments.src.copied = 0;
             }
             arguments.src.copied = arguments.src.copied + 1;
